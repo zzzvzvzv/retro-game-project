@@ -1,0 +1,23 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Editor & IDE Directories
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Temporary & Log Files
+*.log
+*.tmp
+*.bak
+
+# Optional Node/Build artifacts (if ever used)
+node_modules/
+dist/
+.cache/

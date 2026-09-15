@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>彈幕機動戰</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="hud">
+    <span>分數: <span id="score">0</span></span>
+    <span>關卡: <span id="level">1</span></span>
+    <span>血量: <span id="hpHearts">❤❤❤</span></span>
+    <span>雷射: <span id="bombs">3</span></span>
+    <span>火力: <span id="power">1</span></span>
+  </div>
+
+  <div id="statusRow">
+    <div class="statusItem">
+      <span class="statusLabel">閃避</span>
+      <div class="barTrack"><div id="dashBarFill" class="barFill"></div></div>
+    </div>
+    <div class="statusItem">
+      <span class="statusLabel">專注</span>
+      <div class="barTrack"><div id="focusBarFill" class="barFill"></div></div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="520" height="700"></canvas>
+
+  <div id="overlay">
+    <h1 id="overlayTitle">彈幕機動戰</h1>
+    <p id="overlayText">
+      移動：W / A / S / D<br>
+      專注模式：左 Shift（約可持續 1~2 秒，用盡需回充；期間你的子彈碰到敵彈會互相抵銷）<br>
+      射擊：滑鼠左鍵（按住連發）<br>
+      閃避：空白鍵（往目前按住的方向瞬間衝刺，過程中無敵；沒按方向鍵則預設往後閃避）<br>
+      X：發射直線雷射（寬度與機體相同，會隨滑鼠瞄準方向偏轉，持續 0.45 秒，清除彈幕並持續傷害敵機）<br>
+      滑鼠右鍵：在機首前方展開小型扇形力場（持續 0.3 秒），範圍內的敵彈會被暫時凍結；力場結束瞬間，凍結的彈幕會以兩倍速度、兩倍體積噴回，噴回的子彈可抵銷敵彈且自身不會被抵銷
+    </p>
+    <button id="startBtn">開始遊戲</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
