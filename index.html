@@ -1,47 +1,933 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>彈幕機動戰</title>
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="UTF-8">
+<title>彈幕機動戰</title>
+<style>
+  body {
+    margin: 0;
+    background: #05050f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #9ff;
+    overflow: hidden;
+  }
+  #gameCanvas {
+    background: #000;
+    border: 2px solid #6cf;
+    box-shadow: 0 0 25px #39f;
+  }
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    width: 520px;
+    margin-bottom: 8px;
+    font-size: 16px;
+  }
+  #hud span { color: #fff; }
+  #statusRow {
+    display: flex;
+    gap: 24px;
+    width: 520px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    align-items: center;
+  }
+  .statusItem { display: flex; align-items: center; gap: 6px; }
+  .statusLabel { color: #9ff; }
+  .barTrack {
+    width: 100px;
+    height: 10px;
+    background: #112;
+    border: 1px solid #369;
+  }
+  .barFill {
+    height: 100%;
+    width: 100%;
+    background: #6cf;
+  }
+  #hpHearts { color: #f66; letter-spacing: 2px; }
+  #overlay {
+    position: absolute;
+    text-align: center;
+    color: #9ff;
+    display: none;
+    background: rgba(0,0,10,0.85);
+    padding: 30px 40px;
+    border: 1px solid #6cf;
+  }
+  #overlay h1 {
+    font-size: 34px;
+    text-shadow: 0 0 10px #6cf;
+    margin: 0 0 10px;
+  }
+  #overlay p {
+    font-size: 14px;
+    line-height: 1.7;
+    text-align: left;
+  }
+  button {
+    background: #6cf;
+    color: #001;
+    border: none;
+    padding: 10px 24px;
+    font-size: 16px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    margin-top: 14px;
+  }
+  button:hover { background: #9ff; }
+</style>
 </head>
 <body>
 
-  <div id="hud">
-    <span>分數: <span id="score">0</span></span>
-    <span>關卡: <span id="level">1</span></span>
-    <span>血量: <span id="hpHearts">❤❤❤</span></span>
-    <span>雷射: <span id="bombs">3</span></span>
-    <span>火力: <span id="power">1</span></span>
+<div id="hud">
+  <span>分數: <span id="score">0</span></span>
+  <span>關卡: <span id="level">1</span></span>
+  <span>血量: <span id="hpHearts">❤❤❤</span></span>
+  <span>雷射: <span id="bombs">3</span></span>
+  <span>火力: <span id="power">1</span></span>
+</div>
+<div id="statusRow">
+  <div class="statusItem">
+    <span class="statusLabel">閃避</span>
+    <div class="barTrack"><div id="dashBarFill" class="barFill"></div></div>
   </div>
-
-  <div id="statusRow">
-    <div class="statusItem">
-      <span class="statusLabel">閃避</span>
-      <div class="barTrack"><div id="dashBarFill" class="barFill"></div></div>
-    </div>
-    <div class="statusItem">
-      <span class="statusLabel">專注</span>
-      <div class="barTrack"><div id="focusBarFill" class="barFill"></div></div>
-    </div>
+  <div class="statusItem">
+    <span class="statusLabel">專注</span>
+    <div class="barTrack"><div id="focusBarFill" class="barFill"></div></div>
   </div>
+</div>
 
-  <canvas id="gameCanvas" width="520" height="700"></canvas>
+<canvas id="gameCanvas" width="520" height="700"></canvas>
 
-  <div id="overlay">
-    <h1 id="overlayTitle">彈幕機動戰</h1>
-    <p id="overlayText">
-      移動：W / A / S / D<br>
-      專注模式：左 Shift（約可持續 1~2 秒，用盡需回充；期間你的子彈碰到敵彈會互相抵銷）<br>
-      射擊：滑鼠左鍵（按住連發）<br>
-      閃避：空白鍵（往目前按住的方向瞬間衝刺，過程中無敵；沒按方向鍵則預設往後閃避）<br>
-      X：發射直線雷射（寬度與機體相同，會隨滑鼠瞄準方向偏轉，持續 0.45 秒，清除彈幕並持續傷害敵機）<br>
-      滑鼠右鍵：在機首前方展開小型扇形力場（持續 0.3 秒），範圍內的敵彈會被暫時凍結；力場結束瞬間，凍結的彈幕會以兩倍速度、兩倍體積噴回，噴回的子彈可抵銷敵彈且自身不會被抵銷
-    </p>
-    <button id="startBtn">開始遊戲</button>
-  </div>
+<div id="overlay">
+  <h1 id="overlayTitle">彈幕機動戰</h1>
+  <p id="overlayText">
+    移動：W / A / S / D<br>
+    專注模式：左 Shift（約可持續 1~2 秒，用盡需回充；期間你的子彈碰到敵彈會互相抵銷）<br>
+    射擊：滑鼠左鍵（按住連發）<br>
+    閃避：空白鍵（往目前按住的方向瞬間衝刺，過程中無敵；沒按方向鍵則預設往後閃避）<br>
+    X：發射直線雷射（寬度與機體相同，會隨滑鼠瞄準方向偏轉，持續 0.45 秒，清除彈幕並持續傷害敵機）<br>
+    滑鼠右鍵：在機首前方展開小型扇形力場（持續 0.3 秒），範圍內的敵彈會被暫時凍結；力場結束瞬間，凍結的彈幕會以兩倍速度、兩倍體積噴回，噴回的子彈可抵銷敵彈且自身不會被抵銷
+  </p>
+  <button id="startBtn">開始遊戲</button>
+</div>
 
-  <script type="module" src="js/main.js"></script>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const scoreEl = document.getElementById('score');
+const levelEl = document.getElementById('level');
+const hpHeartsEl = document.getElementById('hpHearts');
+const bombsEl = document.getElementById('bombs');
+const powerEl = document.getElementById('power');
+const dashBarFillEl = document.getElementById('dashBarFill');
+const focusBarFillEl = document.getElementById('focusBarFill');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayText = document.getElementById('overlayText');
+const startBtn = document.getElementById('startBtn');
+
+const MAX_LIVES = 3;
+const DASH_COOLDOWN_MAX = 42;
+const FOCUS_MAX = 96; // 約 1.6 秒 @60fps
+const BEAM_DURATION = 27; // 0.45 秒 @60fps
+const FIELD_DURATION = 18; // 0.3 秒 @60fps
+const FIELD_COOLDOWN = 80;
+const FIELD_RADIUS = 130;
+const FIELD_HALF_ANGLE = 35 * Math.PI / 180; // 扇形半張角
+
+let score = 0, lives = 3, level = 1, bombs = 3;
+let gameRunning = false;
+let animId = null;
+let frameCount = 0;
+let invincibleFrames = 0;
+let focusActive = false;
+let mouseDown = false;
+
+const player = {
+  x: W/2, y: H - 100,
+  w: 16, h: 22,
+  speed: 6.5,
+  focusSpeed: 2.8,
+  hitboxR: 2.2,
+  cooldown: 0,
+  power: 1, // 1~5
+  dashFrames: 0,
+  dashCooldown: 0,
+  dashDirX: 0,
+  dashDirY: 1,
+  dashTrail: [],
+  focusEnergy: FOCUS_MAX,
+  beamActive: false,
+  beamFrames: 0,
+  beamCooldown: 0,
+  beamAngle: -Math.PI / 2,
+  fieldActive: false,
+  fieldFrames: 0,
+  fieldCooldown: 0,
+  fieldAngle: -Math.PI / 2
+};
+
+let reflectedBullets = []; // 力場噴回的子彈 {x,y,vx,vy,r,life}
+let capturedByField = [];  // 目前被力場凍結、尚未噴回的敵彈
+let mouseX = W / 2, mouseY = 0;
+
+let bullets = [];       // 玩家子彈 {x,y,vx,vy,r}
+let enemyBullets = [];  // 敵方子彈 {x,y,vx,vy,r,color}
+let invaders = [];
+let invaderDir = 1;
+let invaderSpeed = 1;
+let invaderMoveTimer = 0;
+let invaderMoveInterval = 30;
+let barriers = []; // 每個 barrier 是一組 blocks
+
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+  if (e.code === 'Space' && !e.repeat) {
+    tryDash();
+  }
+  if (e.code === 'KeyX' && !e.repeat) {
+    activateBeam();
+  }
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+  mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 0) { mouseDown = true; e.preventDefault(); }
+  else if (e.button === 2) { activateField(); e.preventDefault(); }
+});
+window.addEventListener('mouseup', e => {
+  if (e.button === 0) mouseDown = false;
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function createInvaders() {
+  invaders = [];
+  const rows = 4, cols = 8;
+  const startX = 55, startY = 60, gapX = 52, gapY = 42;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const type = r === 0 ? 2 : (r < 3 ? 1 : 0);
+      invaders.push({
+        x: startX + c * gapX,
+        y: startY + r * gapY,
+        w: 28, h: 20,
+        alive: true,
+        type: type,
+        hp: type === 2 ? 3 : (type === 1 ? 2 : 1),
+        maxHp: type === 2 ? 3 : (type === 1 ? 2 : 1),
+        shotTimer: Math.floor(Math.random()*60)
+      });
+    }
+  }
+  invaderSpeed = 1 + (level - 1) * 0.25;
+  invaderMoveInterval = Math.max(9, 28 - (level - 1) * 2);
+}
+
+function createBarriers() {
+  barriers = [];
+  // 散佈於場中多個掩體群，而非只有底部一排
+  const clusterSpecs = [
+    {cx: 60,  cy: 250}, {cx: 150, cy: 300}, {cx: 260, cy: 230},
+    {cx: 370, cy: 300}, {cx: 460, cy: 250}, {cx: 100, cy: 460},
+    {cx: 260, cy: 500}, {cx: 420, cy: 460}, {cx: 180, cy: 400},
+    {cx: 340, cy: 400}
+  ];
+  clusterSpecs.forEach(spec => {
+    let blocks = [];
+    const rows = 3, cols = 3;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        blocks.push({
+          x: spec.cx + c * 9 - 9,
+          y: spec.cy + r * 9 - 9,
+          alive: true
+        });
+      }
+    }
+    barriers.push(blocks);
+  });
+}
+
+function resetGame() {
+  score = 0; lives = 3; level = 1; bombs = 3;
+  player.x = W/2; player.y = H - 100;
+  player.power = 1;
+  player.dashFrames = 0;
+  player.dashCooldown = 0;
+  player.dashTrail = [];
+  player.focusEnergy = FOCUS_MAX;
+  player.beamActive = false;
+  player.beamFrames = 0;
+  player.beamCooldown = 0;
+  player.beamAngle = -Math.PI / 2;
+  player.fieldActive = false;
+  player.fieldFrames = 0;
+  player.fieldCooldown = 0;
+  player.fieldAngle = -Math.PI / 2;
+  reflectedBullets = [];
+  capturedByField = [];
+  bullets = [];
+  enemyBullets = [];
+  invincibleFrames = 90;
+  createInvaders();
+  createBarriers();
+  updateHUD();
+}
+
+function updateHUD() {
+  scoreEl.textContent = score;
+  levelEl.textContent = level;
+  hpHeartsEl.textContent = '❤'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, MAX_LIVES - lives));
+  bombsEl.textContent = bombs;
+  powerEl.textContent = player.power;
+}
+
+function updateStatusBars() {
+  const dashPct = 1 - (player.dashCooldown / DASH_COOLDOWN_MAX);
+  dashBarFillEl.style.width = Math.max(0, Math.min(1, dashPct)) * 100 + '%';
+  dashBarFillEl.style.background = player.dashCooldown > 0 ? '#557' : '#6f6';
+
+  const focusPct = player.focusEnergy / FOCUS_MAX;
+  focusBarFillEl.style.width = Math.max(0, Math.min(1, focusPct)) * 100 + '%';
+  focusBarFillEl.style.background = focusActive ? '#ff6' : (focusPct < 0.25 ? '#f66' : '#6cf');
+}
+
+// ---------- 繪圖 ----------
+function drawPlayer() {
+  player.dashTrail.forEach(t => {
+    ctx.globalAlpha = (t.life / 10) * 0.35;
+    ctx.fillStyle = '#6cf';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, player.w/2, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  const flash = invincibleFrames > 0 && frameCount % 6 < 3;
+  if (flash) return;
+
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.fillStyle = '#6cf';
+  ctx.strokeStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(0, -player.h/2);
+  ctx.lineTo(-player.w/2, player.h/2);
+  ctx.lineTo(0, player.h/3);
+  ctx.lineTo(player.w/2, player.h/2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  if (focusActive) {
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.hitboxR + 2, 0, Math.PI*2);
+    ctx.strokeStyle = '#f66';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.hitboxR, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawInvader(inv) {
+  if (!inv.alive) return;
+  const baseColors = ['#f66', '#6af', '#fe4'];
+  ctx.fillStyle = baseColors[inv.type];
+  ctx.globalAlpha = 0.5 + 0.5 * (inv.hp / inv.maxHp);
+  ctx.fillRect(inv.x, inv.y, inv.w, inv.h);
+  ctx.globalAlpha = 1;
+  ctx.fillRect(inv.x + 5, inv.y - 5, 4, 5);
+  ctx.fillRect(inv.x + inv.w - 9, inv.y - 5, 4, 5);
+}
+
+function drawBarriers() {
+  barriers.forEach(blocks => {
+    blocks.forEach(b => {
+      if (b.alive) {
+        ctx.fillStyle = '#4a4';
+        ctx.fillRect(b.x, b.y, 9, 9);
+      }
+    });
+  });
+}
+
+function drawBullets() {
+  ctx.fillStyle = '#0ff';
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+    ctx.fill();
+  });
+  enemyBullets.forEach(b => {
+    ctx.fillStyle = b.frozen ? '#fff' : b.color;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+    ctx.fill();
+    if (b.frozen) {
+      ctx.strokeStyle = 'rgba(140,220,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  });
+}
+
+function drawReflectedBullets() {
+  ctx.fillStyle = '#ffab1a';
+  reflectedBullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+}
+
+function drawField() {
+  if (!player.fieldActive) return;
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.rotate(player.fieldAngle);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, FIELD_RADIUS, -FIELD_HALF_ANGLE, FIELD_HALF_ANGLE);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(170,220,255,0.18)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(200,240,255,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBeam() {
+  if (!player.beamActive) return;
+  const halfWidth = player.w / 2;
+  const length = Math.hypot(W, H);
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.rotate(player.beamAngle);
+  const grad = ctx.createLinearGradient(0, 0, length, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grad.addColorStop(1, 'rgba(120,220,255,0.7)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, -halfWidth, length, halfWidth * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, -halfWidth, length, halfWidth * 2);
+  ctx.restore();
+}
+
+function drawInvasionLine() {
+  ctx.strokeStyle = 'rgba(255,80,80,0.3)';
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  ctx.moveTo(0, H - 140);
+  ctx.lineTo(W, H - 140);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ---------- 更新邏輯 ----------
+function tryDash() {
+  if (!gameRunning) return;
+  if (player.dashCooldown > 0 || player.dashFrames > 0) return;
+
+  let dx = 0, dy = 0;
+  if (keys['KeyA']) dx -= 1;
+  if (keys['KeyD']) dx += 1;
+  if (keys['KeyW']) dy -= 1;
+  if (keys['KeyS']) dy += 1;
+
+  if (dx === 0 && dy === 0) {
+    dy = 1; // 沒按方向鍵時，預設往後方（畫面下方）閃避
+  }
+  const len = Math.sqrt(dx*dx + dy*dy);
+  player.dashDirX = dx / len;
+  player.dashDirY = dy / len;
+  player.dashFrames = 9;
+  player.dashCooldown = DASH_COOLDOWN_MAX;
+  invincibleFrames = Math.max(invincibleFrames, 12);
+}
+
+function updatePlayer() {
+  const wantFocus = keys['ShiftLeft'] && player.dashFrames === 0;
+  if (wantFocus && player.focusEnergy > 0) {
+    focusActive = true;
+    player.focusEnergy = Math.max(0, player.focusEnergy - 1);
+  } else {
+    focusActive = false;
+    player.focusEnergy = Math.min(FOCUS_MAX, player.focusEnergy + 1.3);
+  }
+  const spd = focusActive ? player.focusSpeed : player.speed;
+
+  if (player.dashFrames > 0) {
+    const dashSpeed = 15;
+    player.dashTrail.push({ x: player.x, y: player.y, life: 10 });
+    player.x += player.dashDirX * dashSpeed;
+    player.y += player.dashDirY * dashSpeed;
+    player.x = Math.max(player.w/2, Math.min(W - player.w/2, player.x));
+    player.y = Math.max(10 + player.h/2, Math.min(H - 10 - player.h/2, player.y));
+    player.dashFrames--;
+  } else {
+    if (keys['KeyA'] && player.x - player.w/2 > 0) player.x -= spd;
+    if (keys['KeyD'] && player.x + player.w/2 < W) player.x += spd;
+    if (keys['KeyW'] && player.y - player.h/2 > 10) player.y -= spd;
+    if (keys['KeyS'] && player.y + player.h/2 < H - 10) player.y += spd;
+  }
+  if (player.dashCooldown > 0) player.dashCooldown--;
+
+  player.dashTrail.forEach(t => t.life--);
+  player.dashTrail = player.dashTrail.filter(t => t.life > 0);
+
+  if (player.cooldown > 0) player.cooldown--;
+  if (mouseDown && player.cooldown <= 0) {
+    fireMainGun();
+    player.cooldown = 6;
+  }
+
+  if (player.beamCooldown > 0) player.beamCooldown--;
+  updateBeam();
+  updateField();
+
+  if (invincibleFrames > 0) invincibleFrames--;
+}
+
+function fireMainGun() {
+  // 依火力等級決定扇形彈幕角度
+  const spreadTable = {
+    1: [0],
+    2: [-12, 12],
+    3: [-18, 0, 18],
+    4: [-26, -9, 9, 26],
+    5: [-32, -16, 0, 16, 32]
+  };
+  const angles = spreadTable[player.power] || [0];
+  angles.forEach(deg => {
+    const rad = deg * Math.PI / 180;
+    bullets.push({
+      x: player.x, y: player.y - player.h/2,
+      vx: Math.sin(rad) * 9,
+      vy: -Math.cos(rad) * 9,
+      r: 3
+    });
+  });
+  // 火力3以上，額外加左右側射
+  if (player.power >= 3) {
+    bullets.push({ x: player.x, y: player.y, vx: -6, vy: -1, r: 2.5 });
+    bullets.push({ x: player.x, y: player.y, vx: 6, vy: -1, r: 2.5 });
+  }
+}
+
+function activateBeam() {
+  if (!gameRunning) return;
+  if (bombs <= 0 || player.beamCooldown > 0 || player.beamActive) return;
+  bombs--;
+  player.beamActive = true;
+  player.beamFrames = BEAM_DURATION; // 0.45 秒
+  player.beamCooldown = 90;
+  updateHUD();
+}
+
+function updateBeam() {
+  if (player.beamFrames > 0) {
+    player.beamFrames--;
+    if (player.beamFrames <= 0) player.beamActive = false;
+  } else {
+    player.beamActive = false;
+  }
+
+  if (!player.beamActive) return;
+
+  const dx = mouseX - player.x, dy = mouseY - player.y;
+  const dlen = Math.sqrt(dx*dx + dy*dy) || 1;
+  player.beamAngle = Math.atan2(dy, dx);
+  const dirX = dx / dlen, dirY = dy / dlen;
+
+  const halfWidth = player.w / 2;
+  const beamLength = Math.hypot(W, H);
+
+  // 清除碰到雷射的敵彈（沿瞄準方向的長條形判定）
+  enemyBullets.forEach(b => {
+    const rx = b.x - player.x, ry = b.y - player.y;
+    const t = rx * dirX + ry * dirY;
+    if (t < -b.r || t > beamLength + b.r) return;
+    const perp = rx * (-dirY) + ry * dirX;
+    if (Math.abs(perp) <= halfWidth + b.r) b.hit = true;
+  });
+  enemyBullets = enemyBullets.filter(b => !b.hit);
+
+  // 對碰到雷射的敵機持續造成傷害
+  invaders.forEach(inv => {
+    if (!inv.alive) return;
+    const cx = inv.x + inv.w/2, cy = inv.y + inv.h/2;
+    const rad = Math.hypot(inv.w, inv.h) / 2;
+    const rx = cx - player.x, ry = cy - player.y;
+    const t = rx * dirX + ry * dirY;
+    if (t < -rad || t > beamLength + rad) return;
+    const perp = rx * (-dirY) + ry * dirX;
+    if (Math.abs(perp) <= halfWidth + rad) {
+      inv.hp -= 1;
+      if (inv.hp <= 0) {
+        inv.alive = false;
+        score += (inv.type + 1) * 10;
+        maybeLevelUpPower();
+      }
+      updateHUD();
+    }
+  });
+}
+
+function activateField() {
+  if (!gameRunning) return;
+  if (player.fieldCooldown > 0 || player.fieldActive) return;
+  const dx = mouseX - player.x, dy = mouseY - player.y;
+  player.fieldAngle = Math.atan2(dy, dx);
+  player.fieldActive = true;
+  player.fieldFrames = FIELD_DURATION;
+  player.fieldCooldown = FIELD_COOLDOWN;
+  capturedByField = [];
+}
+
+function updateField() {
+  if (player.fieldCooldown > 0) player.fieldCooldown--;
+  if (!player.fieldActive) return;
+
+  // 持續將扇形範圍內尚未凍結的敵彈凍結住
+  enemyBullets.forEach(b => {
+    if (b.frozen) return;
+    const dx = b.x - player.x, dy = b.y - player.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > FIELD_RADIUS) return;
+    let angle = Math.atan2(dy, dx) - player.fieldAngle;
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    if (Math.abs(angle) <= FIELD_HALF_ANGLE) {
+      b.frozen = true;
+      capturedByField.push(b);
+    }
+  });
+
+  player.fieldFrames--;
+  if (player.fieldFrames <= 0) {
+    player.fieldActive = false;
+    // 力場結束的瞬間：把凍結的敵彈以兩倍速度、兩倍體積噴回
+    capturedByField.forEach(b => {
+      if (b.hit) return;
+      reflectedBullets.push({
+        x: b.x, y: b.y,
+        vx: -b.vx * 2, vy: -b.vy * 2,
+        r: b.r * 2
+      });
+      b.hit = true;
+    });
+    enemyBullets = enemyBullets.filter(b => !b.hit);
+    capturedByField = [];
+  }
+}
+
+function updateBullets() {
+  bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+  bullets = bullets.filter(b => b.y > -20 && b.x > -20 && b.x < W + 20);
+
+  enemyBullets.forEach(b => { if (!b.frozen) { b.x += b.vx; b.y += b.vy; } });
+  enemyBullets = enemyBullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
+
+  reflectedBullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+  reflectedBullets = reflectedBullets.filter(b => b.y < H + 40 && b.y > -40 && b.x > -40 && b.x < W + 40);
+}
+
+function angleTo(fromX, fromY, toX, toY) {
+  return Math.atan2(toY - fromY, toX - fromX);
+}
+
+function enemyFireAimed(inv, count) {
+  const baseAngle = angleTo(inv.x + inv.w/2, inv.y + inv.h, player.x, player.y);
+  const spread = count > 1 ? 0.22 : 0;
+  const speed = 3 + level * 0.25;
+  for (let i = 0; i < count; i++) {
+    const a = baseAngle + (i - (count-1)/2) * spread;
+    enemyBullets.push({
+      x: inv.x + inv.w/2, y: inv.y + inv.h,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      r: 3.5, color: '#f55'
+    });
+  }
+}
+
+function enemyFireRadial(inv, count) {
+  const speed = 2.2 + level * 0.15;
+  for (let i = 0; i < count; i++) {
+    const a = (Math.PI * 2 / count) * i;
+    enemyBullets.push({
+      x: inv.x + inv.w/2, y: inv.y + inv.h/2,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      r: 3, color: '#f6f'
+    });
+  }
+}
+
+function updateInvaders() {
+  invaderMoveTimer++;
+  if (invaderMoveTimer >= invaderMoveInterval) {
+    invaderMoveTimer = 0;
+    let hitEdge = false;
+    invaders.forEach(inv => {
+      if (!inv.alive) return;
+      inv.x += invaderDir * invaderSpeed * 5;
+      if (inv.x <= 10 || inv.x + inv.w >= W - 10) hitEdge = true;
+    });
+    if (hitEdge) {
+      invaderDir *= -1;
+      invaders.forEach(inv => { if (inv.alive) inv.y += 12; });
+    }
+  }
+
+  const aliveInvaders = invaders.filter(i => i.alive);
+
+  // 侵略線判定
+  aliveInvaders.forEach(inv => {
+    if (inv.y + inv.h >= H - 140) {
+      loseLife(true);
+    }
+  });
+
+  // 個別敵人射擊計時（彈幕密度隨關卡上升）
+  const fireChanceBase = 0.01 + level * 0.0025;
+  aliveInvaders.forEach(inv => {
+    inv.shotTimer--;
+    if (inv.shotTimer <= 0) {
+      const roll = Math.random();
+      if (inv.type === 2) {
+        // 精英型：偏好環狀彈幕
+        if (roll < 0.5) enemyFireRadial(inv, 8 + Math.floor(level/2));
+        else enemyFireAimed(inv, 3);
+      } else if (inv.type === 1) {
+        if (roll < 0.4) enemyFireAimed(inv, 2);
+        else enemyFireAimed(inv, 1);
+      } else {
+        enemyFireAimed(inv, 1);
+      }
+      inv.shotTimer = Math.max(20, 90 - level * 6 - Math.floor(Math.random()*30));
+    }
+  });
+
+  // 隨關卡額外的隨機齊射，增加密度
+  if (aliveInvaders.length > 0 && Math.random() < fireChanceBase) {
+    const shooter = aliveInvaders[Math.floor(Math.random()*aliveInvaders.length)];
+    enemyFireRadial(shooter, 6 + level);
+  }
+}
+
+function circleRectOverlap(cx, cy, r, rect) {
+  const closestX = Math.max(rect.x, Math.min(cx, rect.x + rect.w));
+  const closestY = Math.max(rect.y, Math.min(cy, rect.y + rect.h));
+  const dx = cx - closestX, dy = cy - closestY;
+  return (dx*dx + dy*dy) < r*r;
+}
+
+function checkCollisions() {
+  // 噴回子彈：無條件抵銷敵彈，自身不被抵銷
+  reflectedBullets.forEach(rb => {
+    enemyBullets.forEach(eb => {
+      if (eb.hit) return;
+      const dx = rb.x - eb.x, dy = rb.y - eb.y;
+      const rr = (rb.r + eb.r) * (rb.r + eb.r);
+      if (dx*dx + dy*dy < rr) {
+        eb.hit = true;
+      }
+    });
+  });
+  enemyBullets = enemyBullets.filter(b => !b.hit);
+
+  // 專注模式：玩家子彈與敵彈互相抵銷
+  if (focusActive) {
+    bullets.forEach(pb => {
+      enemyBullets.forEach(eb => {
+        if (!pb.hit && !eb.hit) {
+          const dx = pb.x - eb.x, dy = pb.y - eb.y;
+          const rr = (pb.r + eb.r) * (pb.r + eb.r);
+          if (dx*dx + dy*dy < rr) {
+            pb.hit = true;
+            eb.hit = true;
+          }
+        }
+      });
+    });
+    bullets = bullets.filter(b => !b.hit);
+    enemyBullets = enemyBullets.filter(b => !b.hit);
+  }
+
+  // 玩家子彈 vs 侵略者
+  bullets.forEach(bullet => {
+    invaders.forEach(inv => {
+      if (inv.alive && circleRectOverlap(bullet.x, bullet.y, bullet.r, inv)) {
+        inv.hp -= 1;
+        bullet.hit = true;
+        if (inv.hp <= 0) {
+          inv.alive = false;
+          score += (inv.type + 1) * 10;
+          maybeLevelUpPower();
+        }
+        updateHUD();
+      }
+    });
+  });
+  bullets = bullets.filter(b => !b.hit);
+
+  // 噴回子彈 vs 侵略者（體積加倍，傷害也較高）
+  reflectedBullets.forEach(rb => {
+    invaders.forEach(inv => {
+      if (inv.alive && !rb.hit && circleRectOverlap(rb.x, rb.y, rb.r, inv)) {
+        inv.hp -= 2;
+        rb.hit = true;
+        if (inv.hp <= 0) {
+          inv.alive = false;
+          score += (inv.type + 1) * 10;
+          maybeLevelUpPower();
+        }
+        updateHUD();
+      }
+    });
+  });
+  reflectedBullets = reflectedBullets.filter(b => !b.hit);
+
+  // 玩家子彈 / 敵方子彈 / 噴回子彈 vs 屏障
+  function hitBarriers(bulletList) {
+    bulletList.forEach(bullet => {
+      barriers.forEach(blocks => {
+        blocks.forEach(block => {
+          if (block.alive && circleRectOverlap(bullet.x, bullet.y, bullet.r, {x: block.x, y: block.y, w: 9, h: 9})) {
+            block.alive = false;
+            bullet.hit = true;
+          }
+        });
+      });
+    });
+  }
+  hitBarriers(bullets);
+  hitBarriers(enemyBullets);
+  hitBarriers(reflectedBullets);
+  bullets = bullets.filter(b => !b.hit);
+  enemyBullets = enemyBullets.filter(b => !b.hit);
+  reflectedBullets = reflectedBullets.filter(b => !b.hit);
+
+  // 敵方子彈 vs 玩家（用小判定點）
+  if (invincibleFrames <= 0) {
+    enemyBullets.forEach(bullet => {
+      const dx = bullet.x - player.x, dy = bullet.y - player.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < bullet.r + player.hitboxR) {
+        bullet.hit = true;
+        loseLife(false);
+      }
+    });
+    enemyBullets = enemyBullets.filter(b => !b.hit);
+  }
+
+  // 過關
+  if (invaders.every(inv => !inv.alive)) {
+    level++;
+    bombs = Math.min(5, bombs + 1);
+    bullets = [];
+    enemyBullets = [];
+    invincibleFrames = 60;
+    createInvaders();
+    createBarriers();
+    updateHUD();
+  }
+}
+
+function maybeLevelUpPower() {
+  const newPower = Math.min(5, 1 + Math.floor(score / 400));
+  if (newPower !== player.power) {
+    player.power = newPower;
+    updateHUD();
+  }
+}
+
+function loseLife(instantGameOver) {
+  if (invincibleFrames > 0) return;
+  if (instantGameOver) {
+    lives = 0;
+  } else {
+    lives--;
+  }
+  updateHUD();
+  if (lives <= 0) {
+    endGame();
+  } else {
+    enemyBullets = [];
+    player.x = W/2; player.y = H - 100;
+    player.dashFrames = 0;
+    player.dashCooldown = 0;
+    invincibleFrames = 90;
+  }
+}
+
+function endGame() {
+  gameRunning = false;
+  cancelAnimationFrame(animId);
+  overlayTitle.textContent = '遊戲結束';
+  overlayText.innerHTML = `最終分數: ${score}（第 ${level} 關，火力等級 ${player.power}）`;
+  startBtn.textContent = '再玩一次';
+  overlay.style.display = 'block';
+}
+
+function gameLoop() {
+  frameCount++;
+  ctx.clearRect(0, 0, W, H);
+
+  updatePlayer();
+  updateBullets();
+  updateInvaders();
+  checkCollisions();
+
+  drawInvasionLine();
+  drawBarriers();
+  invaders.forEach(drawInvader);
+  drawBullets();
+  drawReflectedBullets();
+  drawBeam();
+  drawField();
+  drawPlayer();
+  updateStatusBars();
+
+  if (gameRunning) {
+    animId = requestAnimationFrame(gameLoop);
+  }
+}
+
+startBtn.addEventListener('click', () => {
+  resetGame();
+  overlay.style.display = 'none';
+  gameRunning = true;
+  frameCount = 0;
+  gameLoop();
+});
+
+overlay.style.display = 'block';
+</script>
+
 </body>
 </html>
