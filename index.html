@@ -54,7 +54,7 @@
   #hpHearts { color: #f66; letter-spacing: 2px; }
   #soundToggleBtn {
     margin-left: auto;
-    background: rgba(10,25,45,0.8);
+    background: rgba(10,25,45,0.85);
     border: 1px solid #369;
     color: #9ff;
     padding: 3px 10px;
@@ -74,36 +74,69 @@
     text-align: center;
     color: #9ff;
     display: none;
-    background: rgba(0,0,10,0.88);
-    padding: 30px 40px;
+    background: rgba(0,0,10,0.92);
+    padding: 26px 36px;
     border: 1px solid #6cf;
-    box-shadow: 0 0 30px rgba(102, 204, 255, 0.4);
-    max-width: 540px;
+    box-shadow: 0 0 35px rgba(102, 204, 255, 0.45);
+    max-width: 550px;
     box-sizing: border-box;
+    border-radius: 4px;
   }
   #overlay h1 {
     font-size: 34px;
-    text-shadow: 0 0 10px #6cf;
-    margin: 0 0 10px;
+    text-shadow: 0 0 12px #6cf;
+    margin: 0 0 4px;
+  }
+  #overlayAuthor {
+    color: #6cf;
+    font-size: 15px;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(102,204,255,0.6);
   }
   #overlay p {
-    font-size: 14px;
+    font-size: 13.5px;
     line-height: 1.7;
     text-align: left;
+    margin: 0 0 14px 0;
+    background: rgba(5,15,30,0.6);
+    padding: 12px 16px;
+    border-left: 2px solid #6cf;
+    border-radius: 2px;
   }
-  button.actionBtn {
+  .actionBtn {
     background: #6cf;
     color: #001;
     border: none;
-    padding: 10px 24px;
+    padding: 10px 26px;
     font-size: 16px;
     cursor: pointer;
     font-family: 'Courier New', monospace;
-    margin-top: 14px;
     font-weight: bold;
     transition: all 0.2s;
+    border-radius: 3px;
   }
-  button.actionBtn:hover { background: #9ff; box-shadow: 0 0 12px #9ff; }
+  .actionBtn:hover {
+    background: #9ff;
+    box-shadow: 0 0 14px #9ff;
+  }
+  #overlayMusicBtn {
+    background: rgba(12,32,60,0.85);
+    color: #9ff;
+    border: 1px solid #369;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+  #overlayMusicBtn:hover {
+    background: #183e6c;
+    border-color: #6cf;
+    box-shadow: 0 0 10px #39f;
+  }
 </style>
 </head>
 <body>
@@ -131,6 +164,7 @@
 
 <div id="overlay">
   <h1 id="overlayTitle">彈幕機動戰</h1>
+  <div id="overlayAuthor">作者：陳彥竹</div>
   <p id="overlayText">
     移動：W / A / S / D（或方向鍵 ↑ / ↓ / ← / →）<br>
     專注模式：左 Shift（約可持續 1~2 秒，用盡需回充；期間你的子彈碰到敵彈會互相抵銷）<br>
@@ -139,13 +173,18 @@
     X：發射直線雷射（寬度與機體相同，會隨滑鼠瞄準方向偏轉，持續 0.45 秒，清除彈幕並持續傷害敵機）<br>
     滑鼠右鍵：在機首前方展開小型扇形力場（持續 0.3 秒），範圍內的敵彈會被暫時凍結；力場結束瞬間，凍結的彈幕會以兩倍速度、兩倍體積噴回，噴回的子彈可抵銷敵彈且自身不會被抵銷
   </p>
-  <button id="startBtn" class="actionBtn">開始遊戲</button>
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 4px;">
+    <button id="startBtn" class="actionBtn">開始遊戲</button>
+    <div style="font-size: 13px; color: #9ff;">
+      🎵 背景音樂來源：<a id="bgmSourceLink" href="https://opengameart.org/content/5-chiptunes-action" target="_blank" style="color: #6cf; text-decoration: underline; font-weight: bold; letter-spacing: 0.5px;">點擊跳轉至 8-Bit Chiptune 音樂來源 ↗</a>
+    </div>
+  </div>
 </div>
 
 <script>
 // ==========================================
-// 8-bit 原生 Chiptune 音樂與音效引擎 (Web Audio API)
-// 無須載入任何外部音效檔，100% 零相依、跨瀏覽器支援
+// 8-bit 原生 Chiptune 音樂與全技能音效引擎 (Web Audio API)
+// 100% 零外部檔案依賴，跨平台瀏覽器原生運作
 // ==========================================
 class ChiptuneAudioEngine {
   constructor() {
@@ -170,19 +209,19 @@ class ChiptuneAudioEngine {
       'C6': 1046.50
     };
 
-    // 主旋律 (Lead Melody - 64 拍經典太空戰機疾走旋律)
+    // 64 拍主旋律 (Lead Melody - 方波)
     this.melody = [
-      // Bar 1: Am (疾風前進)
+      // Bar 1: Am
       'A4', null, 'C5', null, 'E5', null, 'D5', 'C5',  'A4', null, 'E5', null, 'G5', null, 'E5', null,
-      // Bar 2: F (激昂攀升)
+      // Bar 2: F
       'F4', null, 'A4', null, 'C5', null, 'E5', 'D5',  'C5', null, 'A4', null, 'C5', null, 'D5', null,
-      // Bar 3: C (熱血激戰)
+      // Bar 3: C
       'E5', null, 'G5', null, 'A5', null, 'G5', 'E5',  'D5', null, 'C5', null, 'D5', null, 'E5', null,
-      // Bar 4: G / E7 (旋迴迴轉)
+      // Bar 4: G / E7
       'D5', null, 'B4', null, 'G4', null, 'B4', null,  'E5', null, 'D5', null, 'B4', 'G4', 'E4', null
     ];
 
-    // 8-bit 低音跑動 (Driving Bass - 三角波)
+    // 64 拍節奏低音 (Bassline - 三角波)
     this.bass = [
       // Bar 1: Am
       'A2', 'A3', 'A2', 'A3', 'A2', 'A3', 'A2', 'C3',  'A2', 'A3', 'A2', 'A3', 'A2', 'E3', 'A2', 'G2',
@@ -194,7 +233,7 @@ class ChiptuneAudioEngine {
       'G2', 'G3', 'G2', 'G3', 'G2', 'G3', 'B2', 'D3',  'E2', 'E3', 'E2', 'E3', 'E2', 'G#2', 'B2', 'E3'
     ];
 
-    // 快速分解琶音 (Retro Chiptune Arpeggios - 方波)
+    // 64 拍快速分解琶音 (Arpeggio - 方波)
     this.arps = [
       // Bar 1: Am
       'A3', 'C4', 'E4', 'A4', 'A3', 'C4', 'E4', 'A4',  'A3', 'C4', 'E4', 'A4', 'A3', 'C4', 'E4', 'A4',
@@ -222,10 +261,9 @@ class ChiptuneAudioEngine {
     this.bgmGain.connect(this.masterGain);
 
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.setValueAtTime(0.28, this.ctx.currentTime);
+    this.sfxGain.gain.setValueAtTime(0.30, this.ctx.currentTime);
     this.sfxGain.connect(this.masterGain);
 
-    // 建立 1 秒白噪聲緩衝區（供打擊樂與爆炸音效使用）
     const bufferSize = this.ctx.sampleRate;
     this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = this.noiseBuffer.getChannelData(0);
@@ -266,7 +304,6 @@ class ChiptuneAudioEngine {
   _schedule() {
     if (!this.isPlaying) return;
 
-    // 前瞻排程（每 35ms 排定未來 0.12s 內所有音符，確保完全不卡頓與零延遲）
     while (this.nextNoteTime < this.ctx.currentTime + 0.12) {
       this._playStep(this.step, this.nextNoteTime);
       this.nextNoteTime += this.stepDuration;
@@ -279,25 +316,21 @@ class ChiptuneAudioEngine {
   _playStep(step, time) {
     if (!this.ctx) return;
 
-    // 1. 主旋律 (方波)
     const melNote = this.melody[step];
     if (melNote && this.NOTE_FREQ[melNote]) {
       this._playPulse(this.NOTE_FREQ[melNote], time, this.stepDuration * 1.5, 'square', 0.11);
     }
 
-    // 2. 8-bit 分解琶音 (方波微弱襯底)
     const arpNote = this.arps[step];
     if (arpNote && this.NOTE_FREQ[arpNote]) {
       this._playPulse(this.NOTE_FREQ[arpNote], time, this.stepDuration * 0.7, 'square', 0.04);
     }
 
-    // 3. 節奏低音 (三角波)
     const bassNote = this.bass[step];
     if (bassNote && this.NOTE_FREQ[bassNote]) {
       this._playPulse(this.NOTE_FREQ[bassNote], time, this.stepDuration * 0.88, 'triangle', 0.20);
     }
 
-    // 4. 8-bit 打擊樂
     const barStep = step % 16;
     if (barStep === 0 || barStep === 8) {
       this._playKick(time);
@@ -313,16 +346,12 @@ class ChiptuneAudioEngine {
   _playPulse(freq, time, duration, type = 'square', volume = 0.1) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-
     osc.type = type;
     osc.frequency.setValueAtTime(freq, time);
-
     gain.gain.setValueAtTime(volume, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
     osc.connect(gain);
     gain.connect(this.bgmGain);
-
     osc.start(time);
     osc.stop(time + duration);
   }
@@ -330,17 +359,13 @@ class ChiptuneAudioEngine {
   _playKick(time) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(140, time);
     osc.frequency.exponentialRampToValueAtTime(32, time + 0.08);
-
     gain.gain.setValueAtTime(0.28, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
-
     osc.connect(gain);
     gain.connect(this.bgmGain);
-
     osc.start(time);
     osc.stop(time + 0.09);
   }
@@ -349,20 +374,16 @@ class ChiptuneAudioEngine {
     if (!this.noiseBuffer) return;
     const noise = this.ctx.createBufferSource();
     noise.buffer = this.noiseBuffer;
-
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(1100, time);
     filter.Q.setValueAtTime(1.2, time);
-
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.16, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.bgmGain);
-
     noise.start(time);
     noise.stop(time + 0.1);
   }
@@ -371,87 +392,245 @@ class ChiptuneAudioEngine {
     if (!this.noiseBuffer) return;
     const noise = this.ctx.createBufferSource();
     noise.buffer = this.noiseBuffer;
-
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'highpass';
     filter.frequency.setValueAtTime(6500, time);
-
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.05, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
-
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.bgmGain);
-
     noise.start(time);
     noise.stop(time + 0.04);
   }
 
-  // 8-bit 音效：射擊
+  // ---------- 技能與戰鬥音效 (SFX) ----------
+
+  // 1. 普通射擊
   playShoot() {
     if (!this.ctx || this.isMuted) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     const now = this.ctx.currentTime;
-
     osc.type = 'square';
     osc.frequency.setValueAtTime(880, now);
     osc.frequency.exponentialRampToValueAtTime(350, now + 0.04);
-
     gain.gain.setValueAtTime(0.035, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
     osc.connect(gain);
     gain.connect(this.sfxGain);
-
     osc.start(now);
     osc.stop(now + 0.04);
   }
 
-  // 8-bit 音效：爆炸
+  // 2. 爆炸音效
   playExplosion() {
     if (!this.ctx || !this.noiseBuffer || this.isMuted) return;
     const now = this.ctx.currentTime;
     const noise = this.ctx.createBufferSource();
     noise.buffer = this.noiseBuffer;
-
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(750, now);
     filter.frequency.linearRampToValueAtTime(120, now + 0.18);
-
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.18, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.sfxGain);
-
     noise.start(now);
     noise.stop(now + 0.18);
   }
 
-  // 8-bit 音效：衝刺閃避
+  // 3. 閃避瞬移衝刺 (Dash)
   playDash() {
     if (!this.ctx || this.isMuted) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     const now = this.ctx.currentTime;
-
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(260, now);
-    osc.frequency.exponentialRampToValueAtTime(900, now + 0.11);
-
-    gain.gain.setValueAtTime(0.07, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-
+    osc.frequency.exponentialRampToValueAtTime(920, now + 0.12);
+    gain.gain.setValueAtTime(0.09, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
     gain.connect(this.sfxGain);
-
     osc.start(now);
-    osc.stop(now + 0.11);
+    osc.stop(now + 0.12);
+  }
+
+  // 4. 直線雷射光束 (Beam - 按 X)
+  playBeam() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    // 重低音能量振盪
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(180, now);
+    osc1.frequency.linearRampToValueAtTime(80, now + 0.45);
+    gain1.gain.setValueAtTime(0.20, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc1.connect(gain1);
+    gain1.connect(this.sfxGain);
+    osc1.start(now);
+    osc1.stop(now + 0.45);
+
+    // 高頻離子光束呼嘯
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(1400, now);
+    osc2.frequency.exponentialRampToValueAtTime(450, now + 0.45);
+    gain2.gain.setValueAtTime(0.09, now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(this.sfxGain);
+    osc2.start(now);
+    osc2.stop(now + 0.45);
+  }
+
+  // 5. 扇形時空力場開啟 (Field - 滑鼠右鍵)
+  playFieldActivate() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(750, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  // 6. 力場凍結敵彈 (Capture)
+  playFieldCapture() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1320, now);
+    osc.frequency.setValueAtTime(1760, now + 0.02);
+    gain.gain.setValueAtTime(0.045, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  // 7. 力場倍速噴回彈幕 (Reflect)
+  playFieldReflect() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    // 逆向噴射呼嘯
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.16);
+    gain.gain.setValueAtTime(0.20, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.16);
+
+    // 伴隨反彈衝擊音
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1600, now);
+      const ngain = this.ctx.createGain();
+      ngain.gain.setValueAtTime(0.16, now);
+      ngain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      noise.connect(filter);
+      filter.connect(ngain);
+      ngain.connect(this.sfxGain);
+      noise.start(now);
+      noise.stop(now + 0.1);
+    }
+  }
+
+  // 8. 專注模式啟動 (Focus Mode - Shift)
+  playFocus() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.linearRampToValueAtTime(780, now + 0.08);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  // 9. 子彈相消音效 (Cancel)
+  playBulletCancel() {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.setValueAtTime(1200, now + 0.015);
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.035);
+  }
+
+  // 10. 火力升級音效 (Power Up)
+  playPowerUp() {
+    if (!this.ctx || this.isMuted) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, idx) => {
+      const now = this.ctx.currentTime + idx * 0.06;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    });
+  }
+
+  // 11. 過關慶祝音效 (Level Clear)
+  playLevelClear() {
+    if (!this.ctx || this.isMuted) return;
+    const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+    notes.forEach((freq, idx) => {
+      const now = this.ctx.currentTime + idx * 0.08;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (idx === 3 ? 0.35 : 0.09));
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now);
+      osc.stop(now + (idx === 3 ? 0.35 : 0.09));
+    });
   }
 }
 
@@ -473,6 +652,7 @@ const dashBarFillEl = document.getElementById('dashBarFill');
 const focusBarFillEl = document.getElementById('focusBarFill');
 const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlayTitle');
+const overlayAuthor = document.getElementById('overlayAuthor');
 const overlayText = document.getElementById('overlayText');
 const startBtn = document.getElementById('startBtn');
 const soundToggleBtn = document.getElementById('soundToggleBtn');
@@ -835,6 +1015,9 @@ function tryDash() {
 function updatePlayer() {
   const wantFocus = keys['ShiftLeft'] && player.dashFrames === 0;
   if (wantFocus && player.focusEnergy > 0) {
+    if (!focusActive) {
+      audio.playFocus();
+    }
     focusActive = true;
     player.focusEnergy = Math.max(0, player.focusEnergy - 1);
   } else {
@@ -909,6 +1092,8 @@ function activateBeam() {
   player.beamFrames = BEAM_DURATION;
   player.beamCooldown = 90;
   updateHUD();
+
+  audio.playBeam();
 }
 
 function updateBeam() {
@@ -968,6 +1153,8 @@ function activateField() {
   player.fieldFrames = FIELD_DURATION;
   player.fieldCooldown = FIELD_COOLDOWN;
   capturedByField = [];
+
+  audio.playFieldActivate();
 }
 
 function updateField() {
@@ -985,12 +1172,16 @@ function updateField() {
     if (Math.abs(angle) <= FIELD_HALF_ANGLE) {
       b.frozen = true;
       capturedByField.push(b);
+      audio.playFieldCapture();
     }
   });
 
   player.fieldFrames--;
   if (player.fieldFrames <= 0) {
     player.fieldActive = false;
+    if (capturedByField.length > 0) {
+      audio.playFieldReflect();
+    }
     capturedByField.forEach(b => {
       if (b.hit) return;
       reflectedBullets.push({
@@ -1109,6 +1300,7 @@ function checkCollisions() {
       const rr = (rb.r + eb.r) * (rb.r + eb.r);
       if (dx*dx + dy*dy < rr) {
         eb.hit = true;
+        audio.playBulletCancel();
       }
     });
   });
@@ -1123,6 +1315,7 @@ function checkCollisions() {
           if (dx*dx + dy*dy < rr) {
             pb.hit = true;
             eb.hit = true;
+            audio.playBulletCancel();
           }
         }
       });
@@ -1205,6 +1398,7 @@ function checkCollisions() {
     createInvaders();
     createBarriers();
     updateHUD();
+    audio.playLevelClear();
   }
 }
 
@@ -1213,6 +1407,7 @@ function maybeLevelUpPower() {
   if (newPower !== player.power) {
     player.power = newPower;
     updateHUD();
+    audio.playPowerUp();
   }
 }
 
