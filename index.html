@@ -15,6 +15,7 @@
     font-family: 'Courier New', monospace;
     color: #9ff;
     overflow: hidden;
+    user-select: none;
   }
   #gameCanvas {
     background: #000;
@@ -51,14 +52,34 @@
     background: #6cf;
   }
   #hpHearts { color: #f66; letter-spacing: 2px; }
+  #soundToggleBtn {
+    margin-left: auto;
+    background: rgba(10,25,45,0.8);
+    border: 1px solid #369;
+    color: #9ff;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+  #soundToggleBtn:hover {
+    background: #1a3a60;
+    border-color: #6cf;
+    box-shadow: 0 0 8px #39f;
+  }
   #overlay {
     position: absolute;
     text-align: center;
     color: #9ff;
     display: none;
-    background: rgba(0,0,10,0.85);
+    background: rgba(0,0,10,0.88);
     padding: 30px 40px;
     border: 1px solid #6cf;
+    box-shadow: 0 0 30px rgba(102, 204, 255, 0.4);
+    max-width: 540px;
+    box-sizing: border-box;
   }
   #overlay h1 {
     font-size: 34px;
@@ -70,7 +91,7 @@
     line-height: 1.7;
     text-align: left;
   }
-  button {
+  button.actionBtn {
     background: #6cf;
     color: #001;
     border: none;
@@ -79,8 +100,10 @@
     cursor: pointer;
     font-family: 'Courier New', monospace;
     margin-top: 14px;
+    font-weight: bold;
+    transition: all 0.2s;
   }
-  button:hover { background: #9ff; }
+  button.actionBtn:hover { background: #9ff; box-shadow: 0 0 12px #9ff; }
 </style>
 </head>
 <body>
@@ -101,6 +124,7 @@
     <span class="statusLabel">專注</span>
     <div class="barTrack"><div id="focusBarFill" class="barFill"></div></div>
   </div>
+  <button id="soundToggleBtn">🎵 音樂: 開</button>
 </div>
 
 <canvas id="gameCanvas" width="520" height="700"></canvas>
@@ -108,17 +132,334 @@
 <div id="overlay">
   <h1 id="overlayTitle">彈幕機動戰</h1>
   <p id="overlayText">
-    移動：W / A / S / D<br>
+    移動：W / A / S / D（或方向鍵 ↑ / ↓ / ← / →）<br>
     專注模式：左 Shift（約可持續 1~2 秒，用盡需回充；期間你的子彈碰到敵彈會互相抵銷）<br>
     射擊：滑鼠左鍵（按住連發）<br>
     閃避：空白鍵（往目前按住的方向瞬間衝刺，過程中無敵；沒按方向鍵則預設往後閃避）<br>
     X：發射直線雷射（寬度與機體相同，會隨滑鼠瞄準方向偏轉，持續 0.45 秒，清除彈幕並持續傷害敵機）<br>
     滑鼠右鍵：在機首前方展開小型扇形力場（持續 0.3 秒），範圍內的敵彈會被暫時凍結；力場結束瞬間，凍結的彈幕會以兩倍速度、兩倍體積噴回，噴回的子彈可抵銷敵彈且自身不會被抵銷
   </p>
-  <button id="startBtn">開始遊戲</button>
+  <button id="startBtn" class="actionBtn">開始遊戲</button>
 </div>
 
 <script>
+// ==========================================
+// 8-bit 原生 Chiptune 音樂與音效引擎 (Web Audio API)
+// 無須載入任何外部音效檔，100% 零相依、跨瀏覽器支援
+// ==========================================
+class ChiptuneAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.bgmGain = null;
+    this.sfxGain = null;
+    this.isMuted = false;
+    this.isPlaying = false;
+    this.step = 0;
+    this.tempo = 142; // BPM
+    this.stepDuration = 60 / this.tempo / 4; // 16th 音符 (~0.1056s)
+    this.nextNoteTime = 0;
+    this.schedulerTimer = null;
+    this.noiseBuffer = null;
+
+    this.NOTE_FREQ = {
+      'C2': 65.41, 'D2': 73.42, 'E2': 82.41, 'F2': 87.31, 'G2': 98.00, 'G#2': 103.83, 'A2': 110.00, 'B2': 123.47,
+      'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'G#3': 207.65, 'A3': 220.00, 'B3': 246.94,
+      'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'G#4': 415.30, 'A4': 440.00, 'B4': 493.88,
+      'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+      'C6': 1046.50
+    };
+
+    // 主旋律 (Lead Melody - 64 拍經典太空戰機疾走旋律)
+    this.melody = [
+      // Bar 1: Am (疾風前進)
+      'A4', null, 'C5', null, 'E5', null, 'D5', 'C5',  'A4', null, 'E5', null, 'G5', null, 'E5', null,
+      // Bar 2: F (激昂攀升)
+      'F4', null, 'A4', null, 'C5', null, 'E5', 'D5',  'C5', null, 'A4', null, 'C5', null, 'D5', null,
+      // Bar 3: C (熱血激戰)
+      'E5', null, 'G5', null, 'A5', null, 'G5', 'E5',  'D5', null, 'C5', null, 'D5', null, 'E5', null,
+      // Bar 4: G / E7 (旋迴迴轉)
+      'D5', null, 'B4', null, 'G4', null, 'B4', null,  'E5', null, 'D5', null, 'B4', 'G4', 'E4', null
+    ];
+
+    // 8-bit 低音跑動 (Driving Bass - 三角波)
+    this.bass = [
+      // Bar 1: Am
+      'A2', 'A3', 'A2', 'A3', 'A2', 'A3', 'A2', 'C3',  'A2', 'A3', 'A2', 'A3', 'A2', 'E3', 'A2', 'G2',
+      // Bar 2: F
+      'F2', 'F3', 'F2', 'F3', 'F2', 'F3', 'F2', 'A2',  'F2', 'F3', 'F2', 'F3', 'F2', 'C3', 'F2', 'E2',
+      // Bar 3: C
+      'C3', 'C4', 'C3', 'C4', 'C3', 'C4', 'C3', 'E3',  'C3', 'C4', 'C3', 'C4', 'C3', 'G3', 'C3', 'B2',
+      // Bar 4: G / E
+      'G2', 'G3', 'G2', 'G3', 'G2', 'G3', 'B2', 'D3',  'E2', 'E3', 'E2', 'E3', 'E2', 'G#2', 'B2', 'E3'
+    ];
+
+    // 快速分解琶音 (Retro Chiptune Arpeggios - 方波)
+    this.arps = [
+      // Bar 1: Am
+      'A3', 'C4', 'E4', 'A4', 'A3', 'C4', 'E4', 'A4',  'A3', 'C4', 'E4', 'A4', 'A3', 'C4', 'E4', 'A4',
+      // Bar 2: F
+      'F3', 'A3', 'C4', 'F4', 'F3', 'A3', 'C4', 'F4',  'F3', 'A3', 'C4', 'F4', 'F3', 'A3', 'C4', 'F4',
+      // Bar 3: C
+      'C3', 'E3', 'G3', 'C4', 'C3', 'E3', 'G3', 'C4',  'C3', 'E3', 'G3', 'C4', 'C3', 'E3', 'G3', 'C4',
+      // Bar 4: G / E
+      'G3', 'B3', 'D4', 'G4', 'G3', 'B3', 'D4', 'G4',  'E3', 'G#3', 'B3', 'E4', 'E3', 'G#3', 'B3', 'E4'
+    ];
+  }
+
+  init() {
+    if (this.ctx) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    this.ctx = new AudioContextClass();
+
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.setValueAtTime(0.65, this.ctx.currentTime);
+    this.masterGain.connect(this.ctx.destination);
+
+    this.bgmGain = this.ctx.createGain();
+    this.bgmGain.gain.setValueAtTime(0.22, this.ctx.currentTime);
+    this.bgmGain.connect(this.masterGain);
+
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.setValueAtTime(0.28, this.ctx.currentTime);
+    this.sfxGain.connect(this.masterGain);
+
+    // 建立 1 秒白噪聲緩衝區（供打擊樂與爆炸音效使用）
+    const bufferSize = this.ctx.sampleRate;
+    this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = this.noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+  }
+
+  startBGM() {
+    this.init();
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.step = 0;
+    this.nextNoteTime = this.ctx.currentTime + 0.05;
+    this._schedule();
+  }
+
+  stopBGM() {
+    this.isPlaying = false;
+    if (this.schedulerTimer) {
+      clearTimeout(this.schedulerTimer);
+      this.schedulerTimer = null;
+    }
+  }
+
+  toggleMute() {
+    this.init();
+    this.isMuted = !this.isMuted;
+    if (this.masterGain) {
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.65, this.ctx.currentTime);
+    }
+    return !this.isMuted;
+  }
+
+  _schedule() {
+    if (!this.isPlaying) return;
+
+    // 前瞻排程（每 35ms 排定未來 0.12s 內所有音符，確保完全不卡頓與零延遲）
+    while (this.nextNoteTime < this.ctx.currentTime + 0.12) {
+      this._playStep(this.step, this.nextNoteTime);
+      this.nextNoteTime += this.stepDuration;
+      this.step = (this.step + 1) % 64;
+    }
+
+    this.schedulerTimer = setTimeout(() => this._schedule(), 35);
+  }
+
+  _playStep(step, time) {
+    if (!this.ctx) return;
+
+    // 1. 主旋律 (方波)
+    const melNote = this.melody[step];
+    if (melNote && this.NOTE_FREQ[melNote]) {
+      this._playPulse(this.NOTE_FREQ[melNote], time, this.stepDuration * 1.5, 'square', 0.11);
+    }
+
+    // 2. 8-bit 分解琶音 (方波微弱襯底)
+    const arpNote = this.arps[step];
+    if (arpNote && this.NOTE_FREQ[arpNote]) {
+      this._playPulse(this.NOTE_FREQ[arpNote], time, this.stepDuration * 0.7, 'square', 0.04);
+    }
+
+    // 3. 節奏低音 (三角波)
+    const bassNote = this.bass[step];
+    if (bassNote && this.NOTE_FREQ[bassNote]) {
+      this._playPulse(this.NOTE_FREQ[bassNote], time, this.stepDuration * 0.88, 'triangle', 0.20);
+    }
+
+    // 4. 8-bit 打擊樂
+    const barStep = step % 16;
+    if (barStep === 0 || barStep === 8) {
+      this._playKick(time);
+    }
+    if (barStep === 4 || barStep === 12) {
+      this._playSnare(time);
+    }
+    if (barStep % 2 === 0 && barStep !== 4 && barStep !== 12) {
+      this._playHiHat(time);
+    }
+  }
+
+  _playPulse(freq, time, duration, type = 'square', volume = 0.1) {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+
+    gain.gain.setValueAtTime(volume, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    osc.connect(gain);
+    gain.connect(this.bgmGain);
+
+    osc.start(time);
+    osc.stop(time + duration);
+  }
+
+  _playKick(time) {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, time);
+    osc.frequency.exponentialRampToValueAtTime(32, time + 0.08);
+
+    gain.gain.setValueAtTime(0.28, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+    osc.connect(gain);
+    gain.connect(this.bgmGain);
+
+    osc.start(time);
+    osc.stop(time + 0.09);
+  }
+
+  _playSnare(time) {
+    if (!this.noiseBuffer) return;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1100, time);
+    filter.Q.setValueAtTime(1.2, time);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.16, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.bgmGain);
+
+    noise.start(time);
+    noise.stop(time + 0.1);
+  }
+
+  _playHiHat(time) {
+    if (!this.noiseBuffer) return;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(6500, time);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.05, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.bgmGain);
+
+    noise.start(time);
+    noise.stop(time + 0.04);
+  }
+
+  // 8-bit 音效：射擊
+  playShoot() {
+    if (!this.ctx || this.isMuted) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const now = this.ctx.currentTime;
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(350, now + 0.04);
+
+    gain.gain.setValueAtTime(0.035, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  // 8-bit 音效：爆炸
+  playExplosion() {
+    if (!this.ctx || !this.noiseBuffer || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(750, now);
+    filter.frequency.linearRampToValueAtTime(120, now + 0.18);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    noise.start(now);
+    noise.stop(now + 0.18);
+  }
+
+  // 8-bit 音效：衝刺閃避
+  playDash() {
+    if (!this.ctx || this.isMuted) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const now = this.ctx.currentTime;
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(260, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.11);
+
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.11);
+  }
+}
+
+const audio = new ChiptuneAudioEngine();
+
+// ==========================================
+// 遊戲核心邏輯
+// ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
@@ -134,6 +475,14 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlayTitle');
 const overlayText = document.getElementById('overlayText');
 const startBtn = document.getElementById('startBtn');
+const soundToggleBtn = document.getElementById('soundToggleBtn');
+
+soundToggleBtn.addEventListener('click', () => {
+  const isOn = audio.toggleMute();
+  soundToggleBtn.textContent = isOn ? '🎵 音樂: 開' : '🔇 音樂: 關';
+  soundToggleBtn.style.color = isOn ? '#9ff' : '#668';
+  soundToggleBtn.style.borderColor = isOn ? '#369' : '#334';
+});
 
 const MAX_LIVES = 3;
 const DASH_COOLDOWN_MAX = 42;
@@ -192,6 +541,12 @@ let barriers = []; // 每個 barrier 是一組 blocks
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
+  // 支援方向鍵移動相容
+  if (e.code === 'ArrowLeft') keys['KeyA'] = true;
+  if (e.code === 'ArrowRight') keys['KeyD'] = true;
+  if (e.code === 'ArrowUp') keys['KeyW'] = true;
+  if (e.code === 'ArrowDown') keys['KeyS'] = true;
+
   if (e.code === 'Space') e.preventDefault();
   if (e.code === 'Space' && !e.repeat) {
     tryDash();
@@ -200,7 +555,13 @@ document.addEventListener('keydown', e => {
     activateBeam();
   }
 });
-document.addEventListener('keyup', e => keys[e.code] = false);
+document.addEventListener('keyup', e => {
+  keys[e.code] = false;
+  if (e.code === 'ArrowLeft') keys['KeyA'] = false;
+  if (e.code === 'ArrowRight') keys['KeyD'] = false;
+  if (e.code === 'ArrowUp') keys['KeyW'] = false;
+  if (e.code === 'ArrowDown') keys['KeyS'] = false;
+});
 
 canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
@@ -241,7 +602,6 @@ function createInvaders() {
 
 function createBarriers() {
   barriers = [];
-  // 散佈於場中多個掩體群，而非只有底部一排
   const clusterSpecs = [
     {cx: 60,  cy: 250}, {cx: 150, cy: 300}, {cx: 260, cy: 230},
     {cx: 370, cy: 300}, {cx: 460, cy: 250}, {cx: 100, cy: 460},
@@ -460,7 +820,7 @@ function tryDash() {
   if (keys['KeyS']) dy += 1;
 
   if (dx === 0 && dy === 0) {
-    dy = 1; // 沒按方向鍵時，預設往後方（畫面下方）閃避
+    dy = 1;
   }
   const len = Math.sqrt(dx*dx + dy*dy);
   player.dashDirX = dx / len;
@@ -468,6 +828,8 @@ function tryDash() {
   player.dashFrames = 9;
   player.dashCooldown = DASH_COOLDOWN_MAX;
   invincibleFrames = Math.max(invincibleFrames, 12);
+
+  audio.playDash();
 }
 
 function updatePlayer() {
@@ -514,7 +876,6 @@ function updatePlayer() {
 }
 
 function fireMainGun() {
-  // 依火力等級決定扇形彈幕角度
   const spreadTable = {
     1: [0],
     2: [-12, 12],
@@ -532,11 +893,12 @@ function fireMainGun() {
       r: 3
     });
   });
-  // 火力3以上，額外加左右側射
   if (player.power >= 3) {
     bullets.push({ x: player.x, y: player.y, vx: -6, vy: -1, r: 2.5 });
     bullets.push({ x: player.x, y: player.y, vx: 6, vy: -1, r: 2.5 });
   }
+
+  audio.playShoot();
 }
 
 function activateBeam() {
@@ -544,7 +906,7 @@ function activateBeam() {
   if (bombs <= 0 || player.beamCooldown > 0 || player.beamActive) return;
   bombs--;
   player.beamActive = true;
-  player.beamFrames = BEAM_DURATION; // 0.45 秒
+  player.beamFrames = BEAM_DURATION;
   player.beamCooldown = 90;
   updateHUD();
 }
@@ -567,7 +929,6 @@ function updateBeam() {
   const halfWidth = player.w / 2;
   const beamLength = Math.hypot(W, H);
 
-  // 清除碰到雷射的敵彈（沿瞄準方向的長條形判定）
   enemyBullets.forEach(b => {
     const rx = b.x - player.x, ry = b.y - player.y;
     const t = rx * dirX + ry * dirY;
@@ -577,7 +938,6 @@ function updateBeam() {
   });
   enemyBullets = enemyBullets.filter(b => !b.hit);
 
-  // 對碰到雷射的敵機持續造成傷害
   invaders.forEach(inv => {
     if (!inv.alive) return;
     const cx = inv.x + inv.w/2, cy = inv.y + inv.h/2;
@@ -592,6 +952,7 @@ function updateBeam() {
         inv.alive = false;
         score += (inv.type + 1) * 10;
         maybeLevelUpPower();
+        audio.playExplosion();
       }
       updateHUD();
     }
@@ -613,7 +974,6 @@ function updateField() {
   if (player.fieldCooldown > 0) player.fieldCooldown--;
   if (!player.fieldActive) return;
 
-  // 持續將扇形範圍內尚未凍結的敵彈凍結住
   enemyBullets.forEach(b => {
     if (b.frozen) return;
     const dx = b.x - player.x, dy = b.y - player.y;
@@ -631,7 +991,6 @@ function updateField() {
   player.fieldFrames--;
   if (player.fieldFrames <= 0) {
     player.fieldActive = false;
-    // 力場結束的瞬間：把凍結的敵彈以兩倍速度、兩倍體積噴回
     capturedByField.forEach(b => {
       if (b.hit) return;
       reflectedBullets.push({
@@ -705,21 +1064,18 @@ function updateInvaders() {
 
   const aliveInvaders = invaders.filter(i => i.alive);
 
-  // 侵略線判定
   aliveInvaders.forEach(inv => {
     if (inv.y + inv.h >= H - 140) {
       loseLife(true);
     }
   });
 
-  // 個別敵人射擊計時（彈幕密度隨關卡上升）
   const fireChanceBase = 0.01 + level * 0.0025;
   aliveInvaders.forEach(inv => {
     inv.shotTimer--;
     if (inv.shotTimer <= 0) {
       const roll = Math.random();
       if (inv.type === 2) {
-        // 精英型：偏好環狀彈幕
         if (roll < 0.5) enemyFireRadial(inv, 8 + Math.floor(level/2));
         else enemyFireAimed(inv, 3);
       } else if (inv.type === 1) {
@@ -732,7 +1088,6 @@ function updateInvaders() {
     }
   });
 
-  // 隨關卡額外的隨機齊射，增加密度
   if (aliveInvaders.length > 0 && Math.random() < fireChanceBase) {
     const shooter = aliveInvaders[Math.floor(Math.random()*aliveInvaders.length)];
     enemyFireRadial(shooter, 6 + level);
@@ -747,7 +1102,6 @@ function circleRectOverlap(cx, cy, r, rect) {
 }
 
 function checkCollisions() {
-  // 噴回子彈：無條件抵銷敵彈，自身不被抵銷
   reflectedBullets.forEach(rb => {
     enemyBullets.forEach(eb => {
       if (eb.hit) return;
@@ -760,7 +1114,6 @@ function checkCollisions() {
   });
   enemyBullets = enemyBullets.filter(b => !b.hit);
 
-  // 專注模式：玩家子彈與敵彈互相抵銷
   if (focusActive) {
     bullets.forEach(pb => {
       enemyBullets.forEach(eb => {
@@ -778,7 +1131,6 @@ function checkCollisions() {
     enemyBullets = enemyBullets.filter(b => !b.hit);
   }
 
-  // 玩家子彈 vs 侵略者
   bullets.forEach(bullet => {
     invaders.forEach(inv => {
       if (inv.alive && circleRectOverlap(bullet.x, bullet.y, bullet.r, inv)) {
@@ -788,6 +1140,7 @@ function checkCollisions() {
           inv.alive = false;
           score += (inv.type + 1) * 10;
           maybeLevelUpPower();
+          audio.playExplosion();
         }
         updateHUD();
       }
@@ -795,7 +1148,6 @@ function checkCollisions() {
   });
   bullets = bullets.filter(b => !b.hit);
 
-  // 噴回子彈 vs 侵略者（體積加倍，傷害也較高）
   reflectedBullets.forEach(rb => {
     invaders.forEach(inv => {
       if (inv.alive && !rb.hit && circleRectOverlap(rb.x, rb.y, rb.r, inv)) {
@@ -805,6 +1157,7 @@ function checkCollisions() {
           inv.alive = false;
           score += (inv.type + 1) * 10;
           maybeLevelUpPower();
+          audio.playExplosion();
         }
         updateHUD();
       }
@@ -812,7 +1165,6 @@ function checkCollisions() {
   });
   reflectedBullets = reflectedBullets.filter(b => !b.hit);
 
-  // 玩家子彈 / 敵方子彈 / 噴回子彈 vs 屏障
   function hitBarriers(bulletList) {
     bulletList.forEach(bullet => {
       barriers.forEach(blocks => {
@@ -832,7 +1184,6 @@ function checkCollisions() {
   enemyBullets = enemyBullets.filter(b => !b.hit);
   reflectedBullets = reflectedBullets.filter(b => !b.hit);
 
-  // 敵方子彈 vs 玩家（用小判定點）
   if (invincibleFrames <= 0) {
     enemyBullets.forEach(bullet => {
       const dx = bullet.x - player.x, dy = bullet.y - player.y;
@@ -845,7 +1196,6 @@ function checkCollisions() {
     enemyBullets = enemyBullets.filter(b => !b.hit);
   }
 
-  // 過關
   if (invaders.every(inv => !inv.alive)) {
     level++;
     bombs = Math.min(5, bombs + 1);
@@ -868,6 +1218,7 @@ function maybeLevelUpPower() {
 
 function loseLife(instantGameOver) {
   if (invincibleFrames > 0) return;
+  audio.playExplosion();
   if (instantGameOver) {
     lives = 0;
   } else {
@@ -887,6 +1238,7 @@ function loseLife(instantGameOver) {
 
 function endGame() {
   gameRunning = false;
+  audio.stopBGM();
   cancelAnimationFrame(animId);
   overlayTitle.textContent = '遊戲結束';
   overlayText.innerHTML = `最終分數: ${score}（第 ${level} 關，火力等級 ${player.power}）`;
@@ -919,6 +1271,7 @@ function gameLoop() {
 }
 
 startBtn.addEventListener('click', () => {
+  audio.startBGM();
   resetGame();
   overlay.style.display = 'none';
   gameRunning = true;
